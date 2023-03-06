@@ -1,8 +1,8 @@
 
-from .plate_layout import Study
-from .plate_layout import Plate
-from .plate_layout import QCPlate
-from .pl_logger import logger
+from ..plate import Study
+from ..plate import Plate
+from ..plate import QCPlate
+from ..logger import logger
 # from plate_layout import Study
 # from plate_layout import Plate
 # from plate_layout import QCPlate 
