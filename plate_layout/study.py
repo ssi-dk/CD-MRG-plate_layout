@@ -1,3 +1,4 @@
+import copy
 import datetime
 import os
 
@@ -5,7 +6,8 @@ import os
 import numpy as np
 import pandas as pd
 
-import logger
+
+from .logger import log
 
 
 class Study:
@@ -77,33 +79,33 @@ class Study:
         
         self.records_file_path = records_file
         
-        logger.debug(f"Loading records file: {records_file}")
+        log.debug(f"Loading records file: {records_file}")
         extension = os.path.splitext(records_file)[1]
         
         if not os.path.exists(records_file):
-            logger.error(f"Could not find file{records_file}")
+            log.error(f"Could not find file{records_file}")
             raise FileExistsError(records_file)
         
         if extension == ".xlsx" or extension == ".xls":
-            logger.debug(f"Importing Excel file.")
+            log.debug(f"Importing Excel file.")
             records = pd.read_excel(records_file, )
         elif extension == ".csv":
-            logger.debug(f"Importing csv file.")
+            log.debug(f"Importing csv file.")
             records = pd.read_csv(records_file, )
         else:
-            logger.error(f"File extension not recognized")
+            log.error(f"File extension not recognized")
             records = pd.DataFrame()
                
         self._column_with_group_index = Study.find_column_with_group_index(records)
         
-        logger.debug(f"{records.shape[0]} specimens in file")
-        logger.info("Metadata in file:")
+        log.debug(f"{records.shape[0]} specimens in file")
+        log.info("Metadata in file:")
         for col in records.columns:
-            logger.info(f"\t{col}")
+            log.info(f"\t{col}")
         
         
         if self._column_with_group_index:
-            logger.debug(f"Sorting records in ascending order based on column '{self._column_with_group_index}'")
+            log.debug(f"Sorting records in ascending order based on column '{self._column_with_group_index}'")
             records = records.sort_values(by=[self._column_with_group_index])
             
         self.specimen_records_df = records
@@ -111,7 +113,7 @@ class Study:
     
     def add_specimens_to_plate(self, study_plate: object, specimen_samples_df: object) -> object:
         
-        logger.debug(f"Adding samples to plate {study_plate.plate_id}")
+        log.debug(f"Adding samples to plate {study_plate.plate_id}")
         columns = specimen_samples_df.columns
         
         # keep track on how many wells we should use per batch
@@ -135,7 +137,7 @@ class Study:
             study_plate[i] = well
             
             if plate_specimen_count >= N_specimens_left:
-                    logger.debug(f"\t -> Done. Last specimen placed in {well.name}")
+                    log.debug(f"\t -> Done. Last specimen placed in {well.name}")
                     break
                 
         return study_plate
@@ -179,7 +181,7 @@ class Study:
            
             fig = plate.to_figure(annotation_metadata_key, color_metadata_key, title_str=title_str, **kwargs)
     
-            logger.info(f"Saving plate figure to {file_path}")
+            log.info(f"Saving plate figure to {file_path}")
             
             plt.savefig(file_path)
     
@@ -217,7 +219,7 @@ class Study:
         self.batches = batches
         self.N_batches = batch_count - 1
 
-        logger.info(f"Finished distributing samples to plates; {self.N_batches} batches created.")
+        log.info(f"Finished distributing samples to plates; {self.N_batches} batches created.")
        
         
     @staticmethod
@@ -225,11 +227,11 @@ class Study:
         # Select columns that are integers; currently we can only identify groups based on pair _numbers_ 
         int_cols = specimen_records_df.select_dtypes("int")
                     
-        logger.debug(f"Looking for group index of study pairs in the following table columns:")
+        log.debug(f"Looking for group index of study pairs in the following table columns:")
         
         for col_name in int_cols.columns:
             
-            logger.debug(f"\t\t{col_name}")
+            log.debug(f"\t\t{col_name}")
             
             # sort in ascending order
             int_col = int_cols[col_name].sort_values()
@@ -241,7 +243,7 @@ class Study:
             column_have_pairs = n_zeros == (int_col.shape[0]//2)
 
             if column_have_pairs:# we found a column so let's assume it is the correct one
-                logger.info(f"Found group index in column {col_name}")
+                log.info(f"Found group index in column {col_name}")
                 return col_name
             
         return "" 
@@ -250,7 +252,7 @@ class Study:
     def randomize_order(self, case_control : bool = None, reproducible=True):
         
         if not len(self.specimen_records_df) > 0:
-            logger.error("There are no study records loaded. Use 'load_specimen_records' method to import study records.")
+            log.error("There are no study records loaded. Use 'load_specimen_records' method to import study records.")
             return
         
         if case_control is None:
@@ -264,12 +266,12 @@ class Study:
         if case_control:
             column_with_group_index = self._column_with_group_index
                         
-            logger.info(f"Randomly permuting group order (samples within group unchanged) using variable '{column_with_group_index}'")
-            logger.debug("Creating multiindex dataframe")
+            log.info(f"Randomly permuting group order (samples within group unchanged) using variable '{column_with_group_index}'")
+            log.debug("Creating multiindex dataframe")
             specimen_records_df_copy = specimen_records_df_copy.set_index([column_with_group_index, specimen_records_df_copy.index])
             drop = False
         else:
-            logger.info(f"Randomly permuting sample order.")
+            log.info(f"Randomly permuting sample order.")
             specimen_records_df_copy = specimen_records_df_copy.set_index([specimen_records_df_copy.index, specimen_records_df_copy.index])
             column_with_group_index = 0
             drop = True
@@ -279,9 +281,9 @@ class Study:
 
         # Permute order in table
         if reproducible:
-            logger.info("Using a fixed seed to random number generator for reproducibility; \
+            log.info("Using a fixed seed to random number generator for reproducibility; \
                 running this method will always give the same result.")
-            logger.debug(f"Using class-determined seed {self._seed} for random number generator")
+            log.debug(f"Using class-determined seed {self._seed} for random number generator")
             np.random.seed(self._seed)
 
         permutation_order = np.random.permutation(group_IDs)
