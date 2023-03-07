@@ -114,9 +114,12 @@ plate_layout
 
     if not op.name:
         op.name = f"Study_{date.today()}"
-        
+
     if not op.metadata:
-        op.metadata = (None, None)
+        op.metadata = [None, None]
+
+    if len(op.metadata) < 2:
+        op.metadata = ["", *op.metadata]
 
     study = Study(op.name)
     study.load_specimen_records(op.study_file)

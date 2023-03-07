@@ -11,9 +11,9 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["--study-file", "data/fake_case_control_Npairs_523_Ngroups_5.csv",
-                    "--metadata", "organ", "barcode",
-                    "--qc-file", "config/plate_config.toml"], 
+            "args": ["--study-file", "sample_input/fake_case_control_Npairs_523_Ngroups_5.csv",
+                    "--metadata", "barcode",
+                    "--qc-file", "sample_input/plate_config.toml"], 
             "justMyCode": true
         }
     ]

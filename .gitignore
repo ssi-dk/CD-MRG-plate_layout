@@ -4,6 +4,7 @@ output/
 plate_layout/__pycache__
 tests/__pycache__
 .pytest_cache
+plate_layouts/* # =default output folder created by CLI
 #.vscode/
 
 # Packages #

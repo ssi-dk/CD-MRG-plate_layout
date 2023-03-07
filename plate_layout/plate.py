@@ -488,7 +488,7 @@ class Plate:
             x_i = Xgrid[well.coordinate]
             y_i = Ygrid[well.coordinate]
 
-            annotation_label = well.metadata.get(annotation_metadata_key, "NaN")
+            annotation_label = well.metadata.get(annotation_metadata_key, "")
 
             ax.annotate(annotation_label, (x_i, y_i),
                         horizontalalignment='center',
@@ -500,6 +500,10 @@ class Plate:
         # Create dummy plot to map legends, save plot handles to list
         lh = []
         for key, color in RGB_colors.items():
+
+            if key == "NaN":
+                key = ""
+
             lh.append(ax.scatter([], [], well_size*0.8,
                                  color=color, label=key,
                                  alpha=alpha,

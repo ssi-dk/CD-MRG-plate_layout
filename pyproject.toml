@@ -38,7 +38,7 @@ Source = "https://github.com/ssi-dk/CD-MRG-plate_layout"
 
 # add entry point for CLI 
 [project.scripts]
-plate-layout = "plate_layout.cli:main"
+plate-layout = "plate_layout.bin.plate_layout_cli:main"
 
 [tool.hatch.version]
 path = "plate_layout/__about__.py"
