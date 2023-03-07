@@ -19,11 +19,6 @@ np.set_printoptions(threshold=np.inf)
 np.set_printoptions(linewidth=np.inf)
 
 # TODO
-# The well size in figures should dynamically be set depending on
-# the number of wells in the plate. Currently it is an optional argument to
-# the plot function.
-
-# TODO
 # Try out Sphinx to generate automatic(?) docs for the module
 
 
@@ -426,21 +421,21 @@ class Plate:
 
     def to_figure(self, annotation_metadata_key=None,
                   color_metadata_key=None,
-                  fontsize: int = 8,
-                  rotation: int = 0,
+                  rotation: int = 45,
                   step=10,
                   title_str=None,
-                  alpha=0.7,
-                  well_size=1200,
-                  fig_width=11.69,
-                  fig_height=8.27,
-                  dpi=100,
+                  font_size=7,
+                  alpha=0.6,
+                  fig_height=12,
+                  dpi=300,
                   plt_style="bmh",
                   grid_color=(1, 1, 1),
-                  edge_color=(0.5, 0.5, 0.5),
-                  legend_bb=(0.15, -0.2, 0.7, 1.3),
-                  legend_n_columns=6,
+                  edge_color=(0.99, 0.99, 0.99),
+                  legend_n_columns=4,
                   colormap=None,
+                  marker='o',
+                  filepath=None,
+                  label_color=(0.5, 0.5, 0.5)
                   ) -> object:
 
         if colormap is None:
@@ -463,25 +458,41 @@ class Plate:
         # 3 - create a mesh based on these arrays
         Xgrid, Ygrid = np.meshgrid(x, y)
 
-        # Well size array
-        size_grid = np.ones_like(Xgrid) * well_size
-
         # Get colors for each well
-        well_colors = [well.color for well in self]
-
+        well_colors = [mpl.colors.colorConverter.to_rgba(well.color, alpha=alpha) for well in self]
+        
         # PLOT WELLS AS SCATTER PLOT
         # Style and size
-        fig = plt.figure(dpi=dpi)
+        #fontsize = 3/96 * self.capacity
+
+        s = fig_height / 2
+        height = 2.1*s
+        width = 2.6*s
+        cm = 1/2.54
+        fig = plt.figure(figsize=(width*cm, height*cm), dpi=300)
         plt.style.use(plt_style)
-        fig.set_size_inches(fig_width, fig_height)
         ax = fig.add_subplot(111)
+
+        # Well size array
+        # Size in pixels
+        # get bounding box of ax
+        width_px, height_px = ax.get_tightbbox().bounds[2:4]  # pixels
+        well_size_px = np.power(width_px * height_px / self.capacity, 0.68)
+        well_width = np.sqrt(well_size_px)
+        
+        # size in grid
+   
+        well_width_grid = np.sqrt(x.max() * y.max() / self.capacity)
+
+        size_grid = np.ones_like(Xgrid) * well_size_px
 
         # Create scatter plot
         ax.scatter(Xgrid, Ygrid,
                    s=size_grid,
                    c=well_colors,
-                   alpha=alpha,
-                   edgecolors=edge_color)
+                   edgecolors=edge_color,
+                   linewidths=0.3*well_width_grid,
+                   marker=marker)
 
         # Create annotations
         for well in self:
@@ -494,7 +505,7 @@ class Plate:
                         horizontalalignment='center',
                         verticalalignment='center',
                         rotation=rotation,
-                        fontsize=fontsize)
+                        fontsize=font_size)
 
         # LEGENDS
         # Create dummy plot to map legends, save plot handles to list
@@ -504,43 +515,78 @@ class Plate:
             if key == "NaN":
                 key = ""
 
-            lh.append(ax.scatter([], [], well_size*0.8,
+            lh.append(ax.scatter([], [], well_size_px*0.4,
                                  color=color, label=key,
                                  alpha=alpha,
-                                 edgecolors=edge_color))
+                                 edgecolors=edge_color,))
 
             # Add a legend
+        legend_bb = (0.15, -0.15, 0.7, 0.7)
         # Adjust position depending on number of legend keys to show
         pos = ax.get_position()
-        ax.set_position([pos.x0, pos.y0*2, pos.width, pos.height*0.8])
+        ax.set_position([pos.x0, pos.y0*1.2, pos.width, pos.height])
         ax.legend(
             handles=lh,
             bbox_to_anchor=legend_bb,
             loc='lower center',
             frameon=False,
             labelspacing=1,
-            ncol=legend_n_columns
+            ncol=legend_n_columns,
+            fontsize=font_size
         )
 
         # FIG PROPERTIES
+        crd_pad = 1.1*well_width_grid
+        pad = 0.6*well_width_grid
         # X axis
+        Xticklabels = [e+1 for e in self.columns]
         ax.set_xticks(x)
-        ax.set_xticklabels(self.columns)
-        ax.xaxis.grid(color=grid_color, linestyle='dashed', linewidth=1)
-        ax.set_xlim(-1*x.max()*0.05, x.max()*1.05)
+        ax.set_xticklabels(Xticklabels, fontsize=font_size, weight="bold", color=label_color)
+        ax.xaxis.grid(color=grid_color, linestyle='None', linewidth=0.5)
+        ax.set_xlim(x.min()-crd_pad, x.max()+pad)
 
         # Y axis
         ax.set_yticks(y)
-        ax.set_yticklabels(self._row_labels[::-1])
-        ax.yaxis.grid(color=grid_color, linestyle='dashed', linewidth=1)
-        ax.set_ylim(-1*y.max()*0.07, y.max()*1.07)
+        ax.set_yticklabels(self._row_labels[::-1], fontsize=font_size,  weight="bold", color=label_color)
+        ax.yaxis.grid(color=grid_color, linestyle='None', linewidth=0.5)
+        ax.set_ylim(y.min()-pad, y.max()+crd_pad)
+        
+        ax.tick_params(axis=u'both', which=u'both', length=0, direction="in")
+        ax.xaxis.set_ticks_position('top')
+        X_TICK_PADDING = -step*1.2
+        Y_TICK_PADDING = -step*1.0
+
+        xticks = [*ax.xaxis.get_major_ticks(), *ax.xaxis.get_minor_ticks()]
+        yticks = [*ax.yaxis.get_major_ticks(), *ax.yaxis.get_minor_ticks()]
+
+        for tick in xticks:
+            tick.set_pad(X_TICK_PADDING)
+
+        for tick in yticks:
+            tick.set_pad(Y_TICK_PADDING)
 
         # Hide grid behind graph elements
         ax.set_axisbelow(True)
 
-        ax.set_title(title_str)
+        ax.set_title(title_str, fontsize=12)
+        
+        # folder_path = os.getcwd()
+        # file_format = "png"
+        # file_name = f"plate_name_{self.plate_id}_{annotation_metadata_key}_{color_metadata_key}.{file_format}"
 
-        return fig
+        # file_path = os.path.join(folder_path, file_name)
+
+        # # Define title
+        # title_str = f" Plate {self.plate_id}, showing {annotation_metadata_key} colored by {color_metadata_key}"
+
+        # plt.gcf().set_size_inches(18*cm, 12*cm)
+        
+        # plt.savefig(file_path, format="png")
+        plt.tight_layout()
+        plt.savefig(filepath, format="pdf")
+        plt.close(fig)
+        
+        #return fig
 
     def to_file(self, metadata_keys: list = None,
                 file_path: str = None,
@@ -626,9 +672,9 @@ class Plate:
 # A plate with QC samples is a subclass of a Plate class
 class QCPlate(Plate):
     """_summary_
-    Class that represents a multiwell plate where some wells can 
-    contain quality control samples according to the scheme defined 
-    in QC_config; either a <config_file.toml> file or a dict following 
+    Class that represents a multiwell plate where some wells can
+    contain quality control samples according to the scheme defined
+    in QC_config; either a <config_file.toml> file or a dict following
     the same structure
 
     Args:

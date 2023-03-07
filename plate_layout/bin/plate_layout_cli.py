@@ -9,9 +9,6 @@ import logging
 import argparse
 import os
 
-logging.basicConfig(level=logging.INFO, format='[%(name)s %(levelname)8s] --- %(message)s')
-logger = logging.getLogger(__name__)
-
 
 def setup_option_parser(parser):
 
@@ -44,7 +41,7 @@ def setup_option_parser(parser):
 
     parser.add_argument("--log-level",
                         choices=['info', 'debug'],
-                        default='debug',
+                        default='info',
                         help="level of information printed to console")
 
     parser.add_argument("--export-data",
@@ -97,14 +94,17 @@ plate_layout
         --metadata organ barcode
 
     """
+    log_format = '[%(name)s %(levelname)8s] --- %(message)s'
+    logging.basicConfig(level=logging.INFO, format=log_format)
+    logger = logging.getLogger(__name__)
 
+    # Create parser object
     parser = argparse.ArgumentParser(description=description,
                                      epilog=epilog,
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     op = setup_option_parser(parser)
-
-    print(op)
+    # Change logger level
     if op.log_level == 'debug':
         logger.setLevel(logging.DEBUG)
     else:
@@ -112,6 +112,7 @@ plate_layout
 
     logger.debug("Running plate_layout in CLI mode")
 
+    # Set default arguments if not provided
     if not op.name:
         op.name = f"Study_{date.today()}"
 
@@ -121,25 +122,32 @@ plate_layout
     if len(op.metadata) < 2:
         op.metadata = ["", *op.metadata]
 
+    if not op.output_folder:
+        op.output_folder = os.path.join(os.getcwd(), "plate_layouts/")
+        if not os.path.exists(op.output_folder):
+            logger.debug(f"Creating folder {op.output_folder}")
+            os.mkdir(op.output_folder)
+
+    # Import samples
     study = Study(op.name)
     study.load_specimen_records(op.study_file)
 
     if op.randomize == "yes":
         study.randomize_order()
 
+    # Create QC or basic plate
     if op.qc_file:
         plate = QCPlate(op.qc_file, int(op.plate_size))
     else:
         plate = Plate(int(op.plate_size))
 
+    # Distribute samples onto plates
     study.create_batches(plate)
 
-    if not op.output_folder:
-        op.output_folder = os.path.join(os.getcwd(), "plate_layouts/")
-        if not os.path.exists(op.output_folder):
-            logger.info("Creating folder ")
-            os.mkdir(op.output_folder)
+    # Save results
+    study.to_layout_lists(metadata_keys=op.metadata,
+                          folder_path=op.output_folder)
 
-    study.to_layout_lists(metadata_keys=op.metadata, folder_path=op.output_folder)
-    study.to_layout_figures(
-        op.metadata[1], op.metadata[0], folder_path=op.output_folder)
+    study.to_layout_figures(op.metadata[1],  # used for color annotation
+                            op.metadata[0],  # used for text annotation
+                            folder_path=op.output_folder)

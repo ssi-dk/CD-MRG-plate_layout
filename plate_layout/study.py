@@ -176,11 +176,15 @@ class Study:
             plate.to_figure(annotation_metadata_key,
                             color_metadata_key,
                             title_str=title_str,
+                            filepath=file_path,
                             **kwargs)
 
             logger.info(f"Saving plate figure to {file_path}")
 
-            plt.savefig(file_path)
+            
+            # plt.tight_layout()            
+            # plt.savefig(file_path, format="pdf")
+            
 
     def create_batches(self, plate_layout : object) -> None:
 
