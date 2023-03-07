@@ -1,6 +1,7 @@
 import csv
 import glob
 import itertools
+import logging
 import os
 import string
 import tomli
@@ -10,10 +11,8 @@ import matplotlib as mpl
 import numpy as np
 import pandas as pd
 
-# from pl_logger import logger
-# TODO have to change import depending on if we package the module or use
-# it locally with cli...
-from .logger import log
+# logging.basicConfig(level=logging.INFO, format='[%(name)s %(levelname)s] --- %(message)s')
+logger = logging.getLogger(__name__)
 
 # parameters governing how numpy arrays are printed to console
 np.set_printoptions(threshold=np.inf)
@@ -49,7 +48,7 @@ class Well:
         self.plate_id = plate_id
         self.color = color
         self.size = size
-        
+
         # We do this because of Python's treatment of mutable default arguments
         if metadata is None:
             metadata = {}
@@ -105,8 +104,9 @@ class Plate:
     def __init__(self, plate_dim=None, plate_id=1):
 
         if plate_dim is None:
-            log.info(
-                f"Setting up a default {self._default_n_rows*self._default_n_columns}-well plate.")
+            logger.info(
+                f"Setting up a default {self._default_n_rows*self._default_n_columns}\
+                    -well plate.")
             self._n_rows = self._default_n_rows
             self._n_columns = self._default_n_columns
 
@@ -116,7 +116,9 @@ class Plate:
                 self._n_columns = plate_dim[1]
             else:
                 raise ValueError(
-                    f"Unsupported plate format: {plate_dim}. Must be given as a tuple '(#rows, #columns)', list '[#rows, #columns]' or an integer '#wells in total'")
+                    f"Unsupported plate format: {plate_dim}. Must be given as a tuple \
+                        '(#rows, #columns)', list '[#rows, #columns]' or an integer \
+                            '#wells in total'")
 
         elif isinstance(plate_dim, dict):
             self._n_rows = plate_dim.get("rows", self._default_n_rows)
@@ -131,7 +133,9 @@ class Plate:
 
         else:
             raise ValueError(
-                f"Unsupported plate format: {plate_dim}. Must be given as a tuple '(#rows, #columns)', list '[#rows, #columns]' or an integer '#wells in total'")
+                f"Unsupported plate format: {plate_dim}. Must be given as a tuple \
+                    '(#rows, #columns)', list '[#rows, #columns]' or an integer \
+                        '#wells in total'")
 
         self.plate_id = plate_id
         self.rows = list(range(0, self._n_rows))
@@ -140,15 +144,16 @@ class Plate:
         self._specimen_capacity = self.capacity
 
         self._coordinates = Plate.create_index_coordinates(self.rows, self.columns)
-        self._row_labels, self._alphanumerical_coordinates = Plate.create_alphanumerical_coordinates(
-            self.rows, self.columns)
+        self._row_labels, self._alphanumerical_coordinates = \
+            Plate.create_alphanumerical_coordinates(self.rows, self.columns)
 
         self.define_empty_wells()
         self.create_plate_layout()
 
-        log.info(f"Created a plate template with {len(self)} wells:")
-        log.debug(f"Canonical well coordinates:\n{self}")
-        # logger.debug(f"Well index coordinates:\n{self.to_numpy_array(self._coordinates)}")
+        logger.info(f"Created a plate template with {len(self)} wells:")
+        logger.debug(f"Canonical well coordinates:\n{self}")
+        # logger.debug(f"Well index coordinates:
+        # \n{self.to_numpy_array(self._coordinates)}")
 
     @staticmethod
     def create_index_coordinates(rows, columns) -> list:
@@ -188,26 +193,26 @@ class Plate:
         # READ CONFIG FILE
         if config_file is None:
 
-            log.warning(
-                "No config file specified. Trying to find a toml file in current folder.")
+            logger.warning("No config file specified. \
+                Trying to find a toml file in current folder.")
 
             config_file_search = glob.glob("*.toml")
 
             if config_file_search:
                 config_file = config_file_search[0]
-                log.info(f"Using toml file '{config_file}'")
+                logger.info(f"Using toml file '{config_file}'")
 
         try:
             with open(config_file, mode="rb") as fp:
                 config = tomli.load(fp)
 
-            log.info(f"Successfully loaded config file {config_file}")
-            log.debug(f"{config}")
+            logger.info(f"Successfully loaded config file {config_file}")
+            logger.debug(f"{config}")
 
             return config
 
         except FileNotFoundError:
-            log.error(f"Could not find/open config file {config_file}")
+            logger.error(f"Could not find/open config file {config_file}")
 
             raise FileExistsError(config_file)
 
@@ -215,7 +220,7 @@ class Plate:
 
         wells = []
         well_crd_to_index_map = {}
-        well_name_to_index_map = {}
+        well_name_to_index_map = {}\
 
         for i, crd in enumerate(
             zip(self._coordinates, self._alphanumerical_coordinates)
@@ -310,7 +315,9 @@ class Plate:
 
     # plate
     def __repr__(self):
-        return f"Plate(({len(self.rows)},{len(self.columns)}), plate_id={self.plate_id})"
+        return f"{self.__class__.__name__}(({len(self.rows)},\
+                        {len(self.columns)}),\
+                            plate_id={self.plate_id})"
 
     def update_well_position(self, index):
         self.wells[index].name = self._alphanumerical_coordinates[index]
@@ -324,7 +331,8 @@ class Plate:
 
         if len(data) > self.capacity:
             Warning(
-                f"Number of wells in plate is {self.capacity}, but data contains {len(data)} values")
+                f"Number of wells in plate is {self.capacity}, \
+                    but data contains {len(data)} values")
             return plate_array
 
         for i, well in enumerate(self._coordinates):
@@ -374,7 +382,8 @@ class Plate:
         return self.to_numpy_array(metadata)
 
     def define_metadata_colors(self, metadata_key: str, colormap: str) -> dict:
-        # get number of colors needed == number of (discrete) values represented in wells with metadata_key
+        # get number of colors needed == number of (discrete) values \
+        # represented in wells with metadata_key
         metadata_categories = np.unique(self.get(metadata_key))
 
         N_colors = len(metadata_categories)
@@ -388,15 +397,16 @@ class Plate:
             else:
                 RGB_colors.setdefault("NaN", self._NaN_color)
 
-        log.debug(
+        logger.debug(
             f"Metadata '{metadata_key}' has {N_colors} values: {metadata_categories}.")
-        log.debug(
-            f"Assigning {N_colors} colors from colormap {colormap} to metadata '{metadata_key}' as:")
+        logger.debug(
+            f"Assigning {N_colors} colors from colormap {colormap} to metadata \
+                '{metadata_key}' as:")
 
         key_length = np.max(list(map(len, metadata_categories)))
 
         for key, value in RGB_colors.items():
-            log.debug(
+            logger.debug(
                 f"{key:{key_length}}: ({value[0]:.2f}, {value[1]:.2f}, {value[2]:.2f})")
 
         return RGB_colors
@@ -438,7 +448,8 @@ class Plate:
 
         # Define title
         if title_str is None:
-            title_str = f"Plate {self.plate_id}, showing {annotation_metadata_key} colored by {color_metadata_key}"
+            title_str = f"Plate {self.plate_id}, showing {annotation_metadata_key} \
+                colored by {color_metadata_key}"
 
         # DEFINE COLORS FOR METADATA VALUES
         RGB_colors = self.assign_well_color(color_metadata_key, colormap)
@@ -527,9 +538,13 @@ class Plate:
 
         return fig
 
-    def to_file(self, file_path: str = None,
+    def to_file(self, metadata_keys: list = None,
+                file_path: str = None,
                 file_format: str = "txt",
-                metadata_keys: list = []) -> None:
+                ) -> None:
+
+        if metadata_keys is None:
+            metadata_keys = []
 
         if file_path is None:
             file_name = f"Plate_{self.plate_id}.{file_format}"
@@ -547,7 +562,7 @@ class Plate:
             else:  # deduce file format to use from file extenstion
                 file_format = file_extension[1::]  # don't include . in name
 
-        log.info(f"Writing to file:\n\t{file_path}")
+        logger.info(f"Writing to file:\n\t{file_path}")
 
         if file_format != "txt":
 
@@ -588,18 +603,18 @@ class Plate:
             with open(file_path, "w", newline="\n") as file:
 
                 # Create and write column headers
-                to_write = f"{'well':<{width2}}{'sample name':<{width}}"
-                for key in metadata_keys:
-                    to_write += f"{key:<{width}}"
+                to_write = f"{'well':{width2}}{'sample name':{width}}"
+                # for key in metadata_keys:
+                #     to_write += f"{key:<{width}}"
                 file.write(to_write+"\n")
 
                 # Write rows
                 for well in self:
                     well_name = str().join(well.name.split("_"))
-                    to_write = f"{well_name:<{width2}}{well.metadata['sample_name']:<{width}}"
+                    to_write = f"{well_name:{width2}}{well.metadata['sample_name']:{width}}"
 
-                    for key in metadata_keys:
-                        to_write += f"{str(well.metadata.get(key,'NaN')):<{width}}"
+                    # for key in metadata_keys:
+                    #     to_write += f"{str(well.metadata.get(key,'NaN')):<{width}}"
 
                     file.write(to_write+"\n")
 
@@ -609,7 +624,8 @@ class QCPlate(Plate):
     """_summary_
     Class that represents a multiwell plate where some wells can 
     contain quality control samples according to the scheme defined 
-    in QC_config; either a <config_file.toml> file or a dict following the same structure
+    in QC_config; either a <config_file.toml> file or a dict following 
+    the same structure
 
     Args:
         Plate (_type_): _description_
@@ -634,10 +650,11 @@ class QCPlate(Plate):
                 self.create_QC_plate_layout()
 
             else:
-                log.error(f"No scheme for QC samples provided.")
+                logger.error("No scheme for QC samples provided.")
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(({len(self.rows)},{len(self.columns)}), plate_id={self.plate_id})"
+        return f"{self.__class__.__name__}(({len(self.rows)},{len(self.columns)}), \
+            plate_id={self.plate_id})"
 
     def define_unique_QC_sequences(self):
         """_summary_
@@ -645,7 +662,7 @@ class QCPlate(Plate):
         """
 
         # Check if QC scheme defined in config file
-        log.debug("Setting up QC scheme from config file")
+        logger.debug("Setting up QC scheme from config file")
 
         self.N_specimens_between_QC = self.config['QC']['run_QC_after_n_specimens']
         QCscheme = self.config['QC']['scheme']
@@ -676,9 +693,9 @@ class QCPlate(Plate):
             m_seq.sort(key=lambda x: x[1])
             QC_unique_seq.append(m_seq)
 
-        log.debug(f"{len(QC_unique_seq)} unique QC sequences defined: ")
+        logger.debug(f"{len(QC_unique_seq)} unique QC sequences defined: ")
         for i, qc_seq in enumerate(QC_unique_seq):
-            log.debug(f"\t{i+1}) {qc_seq}")
+            logger.debug(f"\t{i+1}) {qc_seq}")
 
         self._QC_unique_seq = QC_unique_seq
 
@@ -688,7 +705,7 @@ class QCPlate(Plate):
         N_QC_rounds = self.capacity // (self.N_QC_samples_per_round +
                                         self.N_specimens_between_QC - 1)
 
-        log.debug(f"Assigning {N_QC_rounds} QC rounds per plate")
+        logger.debug(f"Assigning {N_QC_rounds} QC rounds per plate")
 
         # Create dict with key = QC round;
         # value = a dict with well indices and associated sequence of QC samples
@@ -715,7 +732,7 @@ class QCPlate(Plate):
                 well_count_start += len(sequence)
                 well_count_start += self.N_specimens_between_QC
 
-                log.debug(
+                logger.debug(
                     f"\t Round {round_count}: {sequence}; wells {well_indices}")
 
         self._QC_rounds = QC_rounds
@@ -726,7 +743,7 @@ class QCPlate(Plate):
 
     def create_QC_plate_layout(self):
 
-        log.info(f"Creating plate layout with QC samples.")
+        logger.info("Creating plate layout with QC samples.")
 
         self.define_unique_QC_sequences()
         self.define_QC_rounds()
@@ -744,9 +761,10 @@ class QCPlate(Plate):
                 counts[sample_code] += 1
                 self.wells[index].metadata["sample_code"] = sample_code
 
-                sample_type = self.config["QC"]["names"][sample[0]]
+                sample_type = self.config["QC"]["names"][sample_code]
                 self.wells[index].metadata["sample_type"] = sample_type
-                self.wells[index].metadata["sample_name"] = f"{sample[0]}{counts[sample_code]}"
+                self.wells[index].metadata["sample_name"] = \
+                    f"{sample_code}{counts[sample_code]}"
 
         # set metadata for wells that are for specimen samples
         for i, index in enumerate(self._well_inds_specimens):
