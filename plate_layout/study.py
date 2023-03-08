@@ -3,10 +3,9 @@ import datetime
 import logging
 import os
 
-import matplotlib.pyplot as plt
+
 import numpy as np
 import pandas as pd
-
 
 
 # logging.basicConfig(level=logging.INFO, format='[%(name)s %(levelname)s] --- %(message)s')
@@ -92,20 +91,19 @@ class Study:
             logger.error("File extension not recognized")
             records = pd.DataFrame()
 
-        self._column_with_group_index = Study.find_column_with_group_index(records)
+        self._column_with_group_index = Study.find_column_with_pair_index(records)
 
         logger.debug(f"{records.shape[0]} specimens in file")
         logger.info("Available metadata in file:")
         for col in records.columns:
             logger.info(f"\t{col}")
 
+        # sort?
         if self._column_with_group_index:
-            logger.info(f"Sorting records in ascending order based on column '{self._column_with_group_index}'")
-
-            records = records.sort_values(by=[self._column_with_group_index])
+            pass
 
         self.specimen_records_df = records
-
+        
     def add_specimens_to_plate(self, study_plate: object,
                                specimen_samples_df: object) -> object:
 
@@ -172,19 +170,13 @@ class Study:
 
             # Define title
             title_str = f"{self.name}: Plate {plate.plate_id}, showing {annotation_metadata_key} colored by {color_metadata_key}"
-
+            
             plate.to_figure(annotation_metadata_key,
                             color_metadata_key,
                             title_str=title_str,
                             filepath=file_path,
+                            save=True,
                             **kwargs)
-
-            logger.info(f"Saving plate figure to {file_path}")
-
-            
-            # plt.tight_layout()            
-            # plt.savefig(file_path, format="pdf")
-            
 
     def create_batches(self, plate_layout : object) -> None:
 
@@ -221,33 +213,7 @@ class Study:
 
         logger.info(f"Finished distributing samples to plates; \
             {self.N_batches} batches created.")
-
-    @staticmethod
-    def find_column_with_group_index(specimen_records_df) -> str:
-        # Select columns that are integers; currently we can only identify groups based on pair _numbers_ 
-        int_cols = specimen_records_df.select_dtypes("int")
-
-        logger.debug("Looking for group index of study pairs in the \
-            following table columns:")
-
-        for col_name in int_cols.columns:
-
-            logger.debug(f"\t\t{col_name}")
-            # sort in ascending order
-            int_col = int_cols[col_name].sort_values()
-            # compute difference: n_1 - n_2, n_2 - n_3, ...
-            int_diffs = np.diff(int_col)
-            # count instances were numbers were the same, i.e. diff == 0
-            n_zeros = np.sum(list(map(lambda x: x == 0, int_diffs)))
-            # we assume column contains pairs if #pairs == #samples / 2
-            column_have_pairs = n_zeros == (int_col.shape[0]//2)
-
-            if column_have_pairs:  # we found a column so let's assume it is the correct one
-                logger.info(f"Found case-control group-index in column '{col_name}'")
-                return col_name
-
-        return ""
-
+        
     def randomize_order(self, case_control : bool = None, reproducible=True):
 
         if not len(self.specimen_records_df) > 0:
@@ -264,6 +230,10 @@ class Study:
 
         if case_control:
             column_with_group_index = self._column_with_group_index
+            
+            # sort by group index 
+            specimen_records_df_copy = Study.sort_by_group(specimen_records_df_copy, self._column_with_group_index)
+
 
             logger.info(f"Randomly permuting group order (samples within \
                 group unchanged) using variable '{column_with_group_index}'")
@@ -275,7 +245,7 @@ class Study:
         else:
             logger.info("Randomly permuting sample order.")
             specimen_records_df_copy = \
-                specimen_records_df_copy.set_index([specimen_records_df_copy.index, 
+                specimen_records_df_copy.set_index([specimen_records_df_copy.index,
                                                     specimen_records_df_copy.index])
             
             column_with_group_index = 0
@@ -311,3 +281,37 @@ class Study:
 
         self._N_permutations += 1
         self.specimen_records_df = specimen_records_df_copy.copy()
+        
+    @staticmethod
+    def sort_by_group(df : object, column_with_group_index : str) -> object:
+        logger.info(f"Sorting records in ascending order based on column '{column_with_group_index}'")
+        df.insert(0, "temp_index", df.index.values)
+        df.sort_values(by=[column_with_group_index, "temp_index"], inplace=True)
+        df.drop(labels="temp_index", axis=1, inplace=True)
+        return df
+    
+    @staticmethod
+    def find_column_with_pair_index(specimen_records_df) -> str:
+        # Select columns that are integers; currently we can only identify groups based on pair _numbers_ 
+        int_cols = specimen_records_df.select_dtypes("int")
+
+        logger.debug("Looking for group index of study pairs in the \
+            following table columns:")
+
+        for col_name in int_cols.columns:
+
+            logger.debug(f"\t\t{col_name}")
+            # sort in ascending order
+            int_col = int_cols[col_name].sort_values()
+            # compute difference: n_1 - n_2, n_2 - n_3, ...
+            int_diffs = np.diff(int_col)
+            # count instances were numbers were the same, i.e. diff == 0
+            n_zeros = np.sum(list(map(lambda x: x == 0, int_diffs)))
+            # we assume column contains pairs if #pairs == #samples / 2
+            column_have_pairs = n_zeros == (int_col.shape[0]//2)
+
+            if column_have_pairs:  # we found a column so let's assume it is the correct one
+                logger.info(f"Found case-control group-index in column '{col_name}'")
+                return col_name
+
+        return ""

@@ -21,6 +21,12 @@ np.set_printoptions(linewidth=np.inf)
 # TODO
 # Try out Sphinx to generate automatic(?) docs for the module
 
+# TODO
+# Write "solution" class/namedtuple to store data pertaining to a solution such as name and volume and concentration 
+
+# Add methods to add solutions to well keep track on volumes
+# and amount of sample/reagents
+
 
 class Well:
     """
@@ -369,6 +375,8 @@ class Plate:
             return [well.name for well in self]
         elif metadata_key == "coordinates":
             return [well.coordinate for well in self]
+        elif metadata_key == "color":
+            return [well.color for well in self]
         else:
             return [well.metadata.get(metadata_key, "NaN") for well in self]
 
@@ -380,6 +388,9 @@ class Plate:
         # get number of colors needed == number of (discrete) values \
         # represented in wells with metadata_key
         metadata_categories = np.unique(self.get(metadata_key))
+
+        # convert to strings in case metadata is numeric
+        metadata_categories = list(map(str, metadata_categories))
 
         N_colors = len(metadata_categories)
 
@@ -431,11 +442,12 @@ class Plate:
                   plt_style="bmh",
                   grid_color=(1, 1, 1),
                   edge_color=(0.99, 0.99, 0.99),
-                  legend_n_columns=4,
+                  legend_n_columns=5,
                   colormap=None,
                   marker='o',
                   filepath=None,
-                  label_color=(0.5, 0.5, 0.5)
+                  label_color=(0.5, 0.5, 0.5),
+                  save=False,
                   ) -> object:
 
         if colormap is None:
@@ -459,7 +471,8 @@ class Plate:
         Xgrid, Ygrid = np.meshgrid(x, y)
 
         # Get colors for each well
-        well_colors = [mpl.colors.colorConverter.to_rgba(well.color, alpha=alpha) for well in self]
+        well_colors = np.ravel(np.flipud(self.get_metadata_as_numpy_array("color")))
+        well_colors = [mpl.colors.colorConverter.to_rgba(col, alpha=alpha) for col in well_colors]
         
         # PLOT WELLS AS SCATTER PLOT
         # Style and size
@@ -467,7 +480,7 @@ class Plate:
 
         s = fig_height / 2
         height = 2.1*s
-        width = 2.6*s
+        width = 3*s
         cm = 1/2.54
         fig = plt.figure(figsize=(width*cm, height*cm), dpi=300)
         plt.style.use(plt_style)
@@ -478,7 +491,7 @@ class Plate:
         # get bounding box of ax
         width_px, height_px = ax.get_tightbbox().bounds[2:4]  # pixels
         well_size_px = np.power(width_px * height_px / self.capacity, 0.68)
-        well_width = np.sqrt(well_size_px)
+        # well_width = np.sqrt(well_size_px)
         
         # size in grid
    
@@ -521,7 +534,7 @@ class Plate:
                                  edgecolors=edge_color,))
 
             # Add a legend
-        legend_bb = (0.15, -0.15, 0.7, 0.7)
+        legend_bb = (0.15, -0.1, 0.7, 0.7)
         # Adjust position depending on number of legend keys to show
         pos = ax.get_position()
         ax.set_position([pos.x0, pos.y0*1.2, pos.width, pos.height])
@@ -582,11 +595,13 @@ class Plate:
         # plt.gcf().set_size_inches(18*cm, 12*cm)
         
         # plt.savefig(file_path, format="png")
-        plt.tight_layout()
-        plt.savefig(filepath, format="pdf")
-        plt.close(fig)
-        
-        #return fig
+        # plt.tight_layout()
+        if save:
+            logger.info(f"Saving plate figure to {filepath}")
+            plt.savefig(filepath, format="pdf")
+            plt.close(fig)
+        else:
+            return fig
 
     def to_file(self, metadata_keys: list = None,
                 file_path: str = None,
@@ -654,8 +669,8 @@ class Plate:
 
                 # Create and write column headers
                 to_write = f"{'well':{width2}}{'sample name':{width}}"
-                # for key in metadata_keys:
-                #     to_write += f"{key:<{width}}"
+                for key in metadata_keys:
+                    to_write += f"{key:<{width}}"
                 file.write(to_write+"\n")
 
                 # Write rows
@@ -663,8 +678,8 @@ class Plate:
                     well_name = str().join(well.name.split("_"))
                     to_write = f"{well_name:{width2}}{well.metadata['sample_name']:{width}}"
 
-                    # for key in metadata_keys:
-                    #     to_write += f"{str(well.metadata.get(key,'NaN')):<{width}}"
+                    for key in metadata_keys:
+                        to_write += f"{str(well.metadata.get(key,'NaN')):<{width}}"
 
                     file.write(to_write+"\n")
 

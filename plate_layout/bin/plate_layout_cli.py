@@ -123,7 +123,7 @@ plate_layout
         op.metadata = ["", *op.metadata]
 
     if not op.output_folder:
-        op.output_folder = os.path.join(os.getcwd(), "plate_layouts/")
+        op.output_folder = os.path.join(os.getcwd(), "sample_output/")
         if not os.path.exists(op.output_folder):
             logger.debug(f"Creating folder {op.output_folder}")
             os.mkdir(op.output_folder)
@@ -133,6 +133,7 @@ plate_layout
     study.load_specimen_records(op.study_file)
 
     if op.randomize == "yes":
+        logger.info("Randomizing sample order")
         study.randomize_order()
 
     # Create QC or basic plate
